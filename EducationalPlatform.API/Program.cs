@@ -5,6 +5,8 @@ using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using EducationalPlatform.API.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace EducationalPlatform.API
 {
@@ -15,6 +17,9 @@ namespace EducationalPlatform.API
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
+
+            builder.Services.AddDbContext<Entities>(options =>
+            options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             builder.Services.AddControllers();
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
