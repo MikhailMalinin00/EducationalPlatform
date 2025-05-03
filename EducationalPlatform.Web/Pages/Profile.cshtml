@@ -1,0 +1,17 @@
+﻿@page
+@model EducationalPlatform.Web.Pages.ProfileModel
+@{
+    ViewData["Title"] = "Профиль";
+}
+
+<h2>Профиль</h2>
+
+@if (User.Identity.IsAuthenticated)
+{
+    <p><strong>Email:</strong> @Model.Email</p>
+    <p><strong>Роль:</strong> @Model.Role</p>
+}
+else
+{
+    <p>Вы не авторизованы.</p>
+}

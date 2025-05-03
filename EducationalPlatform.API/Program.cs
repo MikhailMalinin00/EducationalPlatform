@@ -59,32 +59,48 @@ namespace EducationalPlatform.API
             });
 
             // JWT authentication
-            builder.Services.AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
-            {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                    ValidAudience = builder.Configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]))
-                };
-            });
+            //builder.Services.AddAuthentication(options =>
+            //{
+            //    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            //    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            //})
+            //.AddJwtBearer(options =>
+            //{
+            //    options.TokenValidationParameters = new TokenValidationParameters
+            //    {
+            //        ValidateIssuer = true,
+            //        ValidateAudience = true,
+            //        ValidateLifetime = true,
+            //        ValidateIssuerSigningKey = true,
+            //        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            //        ValidAudience = builder.Configuration["Jwt:Audience"],
+            //        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]))
+            //    };
+            //});
 
-            // Mail.ru authentication
+            // JWT and Mail.ru authentication
             builder.Services.AddAuthentication(options =>
             {
+                //options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                //options.DefaultChallengeScheme = "MailRu";
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = "MailRu";
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             })
                 .AddCookie()
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                        ValidAudience = builder.Configuration["Jwt:Audience"],
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]))
+                    };
+                })
                 .AddOAuth("MailRu", options =>
                 {
 
@@ -106,16 +122,109 @@ namespace EducationalPlatform.API
 
                     options.Events = new OAuthEvents
                     {
+                        //OnCreatingTicket = async context =>
+                        //{
+                        //    var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+                        //    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+
+                        //    var response = await context.Backchannel.SendAsync(request);
+                        //    response.EnsureSuccessStatusCode();
+
+                        //    var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                        //    context.RunClaimActions(json.RootElement);
+
+                        //    // Получаем нужные данные
+                        //    var email = json.RootElement.GetProperty("email").GetString();
+                        //    var name = json.RootElement.GetProperty("name").GetString();
+
+                        //    // Получаем scope сервиса
+                        //    var dbContext = context.HttpContext.RequestServices.GetRequiredService<Entities>();
+
+                        //    if (email != null)
+                        //    {
+                        //        if (email.EndsWith("@edu.fa.ru"))
+                        //        {
+                        //            var existing = dbContext.Students.FirstOrDefault(s => s.Email == email);
+                        //            if (existing == null)
+                        //            {
+                        //                dbContext.Students.Add(new Student
+                        //                {
+                        //                    Email = email,
+                        //                    FullName = name
+                        //                });
+                        //                await dbContext.SaveChangesAsync();
+                        //            }
+                        //        }
+                        //        else if (email.EndsWith("@fa.ru"))
+                        //        {
+                        //            var existing = dbContext.Teachers.FirstOrDefault(t => t.Email == email);
+                        //            if (existing == null)
+                        //            {
+                        //                dbContext.Teachers.Add(new Teacher
+                        //                {
+                        //                    Email = email,
+                        //                    FullName = name
+                        //                });
+                        //                await dbContext.SaveChangesAsync();
+                        //            }
+                        //        }
+                        //    }
+                        //}
+
                         OnCreatingTicket = async context =>
                         {
-                            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-                            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
-
+                            var userInfoUrl = $"{context.Options.UserInformationEndpoint}?access_token={context.AccessToken}";
+                            var request = new HttpRequestMessage(HttpMethod.Get, userInfoUrl);
                             var response = await context.Backchannel.SendAsync(request);
                             response.EnsureSuccessStatusCode();
 
-                            var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-                            context.RunClaimActions(json.RootElement);
+                            var jsonString = await response.Content.ReadAsStringAsync();
+                            var json = JsonDocument.Parse(jsonString);
+                            var root = json.RootElement;
+
+                            var id = root.GetProperty("id").GetString();
+                            var name = root.GetProperty("nickname").GetString();
+                            var email = root.GetProperty("email").GetString();
+
+                            // Присваиваем клеймы
+                            context.Identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, id));
+                            context.Identity.AddClaim(new Claim(ClaimTypes.Name, name));
+                            context.Identity.AddClaim(new Claim(ClaimTypes.Email, email));
+
+                            // Получаем доступ к DbContext
+                            var dbContext = context.HttpContext.RequestServices.GetRequiredService<Entities>();
+
+                            if (email.EndsWith("@edu.fa.ru", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var exists = await dbContext.Students.AnyAsync(s => s.Email == email);
+                                if (!exists)
+                                {
+                                    dbContext.Students.Add(new Student
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        FullName = name,
+                                        Email = email,
+                                        Visibility = true
+                                    });
+                                    await dbContext.SaveChangesAsync();
+                                }
+                            }
+                            else if (email.EndsWith("@fa.ru", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var exists = await dbContext.Teachers.AnyAsync(t => t.Email == email);
+                                if (!exists)
+                                {
+                                    dbContext.Teachers.Add(new Teacher
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        FullName = name,
+                                        Email = email,
+                                        RoleId = Guid.Parse("D93737E7-70CC-4463-8091-8EEE3877FE22"),
+                                        Visibility = true
+                                    });
+                                    await dbContext.SaveChangesAsync();
+                                }
+                            }
                         }
                     };
                 });
@@ -156,15 +265,6 @@ namespace EducationalPlatform.API
             app.UseAuthorization();
 
             app.MapControllers();
-
-            //Не думаю, что мне это пригодится...
-            app.MapGet("/login", async context =>
-            {
-                await context.ChallengeAsync("MailRu", new AuthenticationProperties
-                {
-                    RedirectUri = "/profile"
-                });
-            });
 
             app.Run();
         }
