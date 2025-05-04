@@ -64,7 +64,7 @@ namespace EducationalPlatform.API.Controllers
             }
             else
             {
-                return Unauthorized("Неподдерживаемый домен");
+                return Redirect("https://localhost:7193/error/UnsupportedDomain");
             }
 
             var token = JwtTokenGenerator.GenerateToken(email, role, _config["Jwt:SecretKey"], _config["Jwt:Issuer"]);
