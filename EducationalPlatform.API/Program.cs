@@ -204,6 +204,7 @@ namespace EducationalPlatform.API
                                         Id = Guid.NewGuid(),
                                         FullName = name,
                                         Email = email,
+                                        GroupId = Guid.Parse("082FC3CB-0966-44FC-990E-6CAF0D2AE747"),
                                         Visibility = true
                                     });
                                     await dbContext.SaveChangesAsync();
