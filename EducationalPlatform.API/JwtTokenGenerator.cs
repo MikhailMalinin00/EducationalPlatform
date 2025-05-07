@@ -7,12 +7,11 @@ namespace EducationalPlatform.API
 {
     public static class JwtTokenGenerator
     {
-        public static string GenerateToken(string email, string role, string secretKey, string issuer)
+        public static string GenerateToken(Guid userId, string secretKey, string issuer)
         {
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Email, email),
-                new Claim(ClaimTypes.Role, role)
+                new Claim(JwtRegisteredClaimNames.Sub, userId.ToString())
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));

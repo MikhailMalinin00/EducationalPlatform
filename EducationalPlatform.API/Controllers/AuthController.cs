@@ -43,31 +43,50 @@ namespace EducationalPlatform.API.Controllers
             if (email == null || name == null)
                 return BadRequest("Не удалось получить информацию о пользователе");
 
-            string role;
+            Guid userId;
+
             if (email.EndsWith("@edu.fa.ru"))
             {
-                if (!_context.Students.Any(s => s.Email == email))
+                var student = _context.Students.FirstOrDefault(s => s.Email == email);
+                if (student == null)
                 {
-                    _context.Students.Add(new Student { Email = email, FullName = name });
+                    student = new Student
+                    {
+                        Id = Guid.NewGuid(),
+                        Email = email,
+                        FullName = name,
+                        GroupId = Guid.Parse("082FC3CB-0966-44FC-990E-6CAF0D2AE747"),
+                        Visibility = true
+                    };
+                    _context.Students.Add(student);
                     await _context.SaveChangesAsync();
                 }
-                role = "student";
+                userId = student.Id;
             }
             else if (email.EndsWith("@fa.ru"))
             {
-                if (!_context.Teachers.Any(t => t.Email == email))
+                var teacher = _context.Teachers.FirstOrDefault(t => t.Email == email);
+                if (teacher == null)
                 {
-                    _context.Teachers.Add(new Teacher { Email = email, FullName = name });
+                    teacher = new Teacher
+                    {
+                        Id = Guid.NewGuid(),
+                        Email = email,
+                        FullName = name,
+                        RoleId = Guid.Parse("D93737E7-70CC-4463-8091-8EEE3877FE22"),
+                        Visibility = true
+                    };
+                    _context.Teachers.Add(teacher);
                     await _context.SaveChangesAsync();
                 }
-                role = "teacher";
+                userId = teacher.Id;
             }
             else
             {
                 return Redirect("https://localhost:7193/error/UnsupportedDomain");
             }
 
-            var token = JwtTokenGenerator.GenerateToken(email, role, _config["Jwt:SecretKey"], _config["Jwt:Issuer"]);
+            var token = JwtTokenGenerator.GenerateToken(userId, _config["Jwt:SecretKey"], _config["Jwt:Issuer"]);
 
             Response.Cookies.Append("jwt", token, new CookieOptions
             {
@@ -75,9 +94,9 @@ namespace EducationalPlatform.API.Controllers
                 Secure = true,
                 SameSite = SameSiteMode.None
             });
-            return Redirect("https://localhost:7193/profile");
 
-            //return Ok(new { token, role });
+            return Redirect("https://localhost:7193/profile");
         }
+
     }
 }

@@ -12,6 +12,7 @@ namespace EducationalPlatform.Web
 
             // Add services to the container.
             builder.Services.AddRazorPages();
+            builder.Services.AddHttpClient();
 
             builder.Services.AddAuthentication(options =>
             {
